@@ -10976,12 +10976,16 @@ async function downloadDoctlWithFallback(requestedVersion, type, architecture) {
   if (requestedVersion !== "latest") {
     try {
       core.info(`Attempting to download doctl v${requestedVersion}`);
-      return await downloadDoctl(requestedVersion, type, architecture);
+      const installPath = await downloadDoctl(
+        requestedVersion,
+        type,
+        architecture,
+      );
+      return { installPath, version: requestedVersion };
     } catch (error) {
       core.warning(
-        `Failed to download requested version v${requestedVersion}, will try recent versions`,
+        `Failed to download requested version v${requestedVersion}: ${error.message}, will try recent versions`,
       );
-      core.debug(`Error details: ${error.stack}`);
     }
   }
 
@@ -10995,9 +10999,9 @@ async function downloadDoctlWithFallback(requestedVersion, type, architecture) {
       core.info(`Successfully downloaded doctl v${version}`);
       return { installPath, version };
     } catch (error) {
-      core.warning(`Failed to download doctl v${version}, trying next version`);
-      core.debug(`Error details: ${error.stack}`);
-      continue;
+      core.warning(
+        `Failed to download doctl v${version}: ${error.message}, trying next version`,
+      );
     }
   }
 
@@ -11052,10 +11056,8 @@ Failed to retrieve latest version; falling back to: ${fallbackVersion}`);
       } catch (error) {
         // If the download fails (e.g., missing artifacts), try fallback versions
         core.warning(
-          `Failed to download doctl v${version}, trying fallback versions`,
+          `Failed to download doctl v${version} : ${error.message}, trying fallback versions`,
         );
-        core.debug(`Error details: ${error.stack}`);
-
         const result = await downloadDoctlWithFallback(
           requestedVersion,
           process.platform,
