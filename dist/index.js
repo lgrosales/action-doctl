@@ -8375,7 +8375,7 @@ function iterator(octokit, route, parameters) {
           const response = await requestMethod({ method, url, headers });
           const normalizedResponse = normalizePaginatedListResponse(response);
           url = ((normalizedResponse.headers.link || "").match(
-            /<([^>]+)>;\s*rel="next"/
+            /<([^<>]+)>;\s*rel="next"/
           ) || [])[1];
           return { value: normalizedResponse };
         } catch (error) {
@@ -8440,7 +8440,8 @@ var paginatingEndpoints = (/* unused pure expression or super */ null && ([
   "GET /assignments/{assignment_id}/accepted_assignments",
   "GET /classrooms",
   "GET /classrooms/{classroom_id}/assignments",
-  "GET /enterprises/{enterprise}/copilot/usage",
+  "GET /enterprises/{enterprise}/code-security/configurations",
+  "GET /enterprises/{enterprise}/code-security/configurations/{configuration_id}/repositories",
   "GET /enterprises/{enterprise}/dependabot/alerts",
   "GET /enterprises/{enterprise}/secret-scanning/alerts",
   "GET /events",
@@ -8461,18 +8462,27 @@ var paginatingEndpoints = (/* unused pure expression or super */ null && ([
   "GET /notifications",
   "GET /organizations",
   "GET /orgs/{org}/actions/cache/usage-by-repository",
+  "GET /orgs/{org}/actions/hosted-runners",
   "GET /orgs/{org}/actions/permissions/repositories",
+  "GET /orgs/{org}/actions/runner-groups",
+  "GET /orgs/{org}/actions/runner-groups/{runner_group_id}/hosted-runners",
+  "GET /orgs/{org}/actions/runner-groups/{runner_group_id}/repositories",
+  "GET /orgs/{org}/actions/runner-groups/{runner_group_id}/runners",
   "GET /orgs/{org}/actions/runners",
   "GET /orgs/{org}/actions/secrets",
   "GET /orgs/{org}/actions/secrets/{secret_name}/repositories",
   "GET /orgs/{org}/actions/variables",
   "GET /orgs/{org}/actions/variables/{name}/repositories",
+  "GET /orgs/{org}/attestations/{subject_digest}",
   "GET /orgs/{org}/blocks",
   "GET /orgs/{org}/code-scanning/alerts",
+  "GET /orgs/{org}/code-security/configurations",
+  "GET /orgs/{org}/code-security/configurations/{configuration_id}/repositories",
   "GET /orgs/{org}/codespaces",
   "GET /orgs/{org}/codespaces/secrets",
   "GET /orgs/{org}/codespaces/secrets/{secret_name}/repositories",
   "GET /orgs/{org}/copilot/billing/seats",
+  "GET /orgs/{org}/copilot/metrics",
   "GET /orgs/{org}/copilot/usage",
   "GET /orgs/{org}/dependabot/alerts",
   "GET /orgs/{org}/dependabot/secrets",
@@ -8481,6 +8491,9 @@ var paginatingEndpoints = (/* unused pure expression or super */ null && ([
   "GET /orgs/{org}/failed_invitations",
   "GET /orgs/{org}/hooks",
   "GET /orgs/{org}/hooks/{hook_id}/deliveries",
+  "GET /orgs/{org}/insights/api/route-stats/{actor_type}/{actor_id}",
+  "GET /orgs/{org}/insights/api/subject-stats",
+  "GET /orgs/{org}/insights/api/user-stats/{user_id}",
   "GET /orgs/{org}/installations",
   "GET /orgs/{org}/invitations",
   "GET /orgs/{org}/invitations/{invitation_id}/teams",
@@ -8498,14 +8511,18 @@ var paginatingEndpoints = (/* unused pure expression or super */ null && ([
   "GET /orgs/{org}/personal-access-token-requests/{pat_request_id}/repositories",
   "GET /orgs/{org}/personal-access-tokens",
   "GET /orgs/{org}/personal-access-tokens/{pat_id}/repositories",
+  "GET /orgs/{org}/private-registries",
   "GET /orgs/{org}/projects",
   "GET /orgs/{org}/properties/values",
   "GET /orgs/{org}/public_members",
   "GET /orgs/{org}/repos",
   "GET /orgs/{org}/rulesets",
   "GET /orgs/{org}/rulesets/rule-suites",
+  "GET /orgs/{org}/rulesets/{ruleset_id}/history",
   "GET /orgs/{org}/secret-scanning/alerts",
   "GET /orgs/{org}/security-advisories",
+  "GET /orgs/{org}/settings/network-configurations",
+  "GET /orgs/{org}/team/{team_slug}/copilot/metrics",
   "GET /orgs/{org}/team/{team_slug}/copilot/usage",
   "GET /orgs/{org}/teams",
   "GET /orgs/{org}/teams/{team_slug}/discussions",
@@ -8535,6 +8552,7 @@ var paginatingEndpoints = (/* unused pure expression or super */ null && ([
   "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs",
   "GET /repos/{owner}/{repo}/activity",
   "GET /repos/{owner}/{repo}/assignees",
+  "GET /repos/{owner}/{repo}/attestations/{subject_digest}",
   "GET /repos/{owner}/{repo}/branches",
   "GET /repos/{owner}/{repo}/check-runs/{check_run_id}/annotations",
   "GET /repos/{owner}/{repo}/check-suites/{check_suite_id}/check-runs",
@@ -8577,6 +8595,7 @@ var paginatingEndpoints = (/* unused pure expression or super */ null && ([
   "GET /repos/{owner}/{repo}/issues/{issue_number}/events",
   "GET /repos/{owner}/{repo}/issues/{issue_number}/labels",
   "GET /repos/{owner}/{repo}/issues/{issue_number}/reactions",
+  "GET /repos/{owner}/{repo}/issues/{issue_number}/sub_issues",
   "GET /repos/{owner}/{repo}/issues/{issue_number}/timeline",
   "GET /repos/{owner}/{repo}/keys",
   "GET /repos/{owner}/{repo}/labels",
@@ -8599,6 +8618,7 @@ var paginatingEndpoints = (/* unused pure expression or super */ null && ([
   "GET /repos/{owner}/{repo}/rules/branches/{branch}",
   "GET /repos/{owner}/{repo}/rulesets",
   "GET /repos/{owner}/{repo}/rulesets/rule-suites",
+  "GET /repos/{owner}/{repo}/rulesets/{ruleset_id}/history",
   "GET /repos/{owner}/{repo}/secret-scanning/alerts",
   "GET /repos/{owner}/{repo}/secret-scanning/alerts/{alert_number}/locations",
   "GET /repos/{owner}/{repo}/security-advisories",
@@ -8652,6 +8672,7 @@ var paginatingEndpoints = (/* unused pure expression or super */ null && ([
   "GET /user/subscriptions",
   "GET /user/teams",
   "GET /users",
+  "GET /users/{username}/attestations/{subject_digest}",
   "GET /users/{username}/events",
   "GET /users/{username}/events/orgs/{org}",
   "GET /users/{username}/events/public",
@@ -10881,163 +10902,186 @@ const exec = __nccwpck_require__(1514);
 const tc = __nccwpck_require__(7784);
 const { Octokit } = __nccwpck_require__(1273);
 
-const baseDownloadURL = "https://github.com/digitalocean/doctl/releases/download";
+const baseDownloadURL =
+  "https://github.com/digitalocean/doctl/releases/download";
 const fallbackVersion = "1.98.1";
 const octokit = new Octokit();
 
 async function getRecentReleases(count = 5) {
-    try {
-        const response = await octokit.repos.listReleases({
-            owner: 'digitalocean',
-            repo: 'doctl',
-            per_page: count
-        });
-        return response.data.map(release => release.name);
-    } catch (error) {
-        core.warning(`Failed to fetch recent releases: ${error.message}`);
-        return [fallbackVersion];
-    }
+  try {
+    const response = await octokit.repos.listReleases({
+      owner: "digitalocean",
+      repo: "doctl",
+      per_page: count,
+    });
+    return response.data.map((release) => release.name);
+  } catch (error) {
+    core.warning(`Failed to fetch recent releases: ${error.message}`);
+    return [fallbackVersion];
+  }
 }
 
 async function downloadDoctl(version, type, architecture) {
-    var platform = 'linux';
-    var arch = 'amd64';
-    var extension = 'tar.gz';
+  var platform = "linux";
+  var arch = "amd64";
+  var extension = "tar.gz";
 
-    switch (type) {
-        case 'darwin':
-            platform = 'darwin';
-            break;
-        case 'win32':
-            platform = 'windows';
-            extension = 'zip'
-            break;
-        case 'linux':
-            platform = 'linux';
-            break;
-        default:
-            core.warning(`unknown platform: ${type}; defaulting to ${platform}`);
-            break;
-    }
+  switch (type) {
+    case "darwin":
+      platform = "darwin";
+      break;
+    case "win32":
+      platform = "windows";
+      extension = "zip";
+      break;
+    case "linux":
+      platform = "linux";
+      break;
+    default:
+      core.warning(`unknown platform: ${type}; defaulting to ${platform}`);
+      break;
+  }
 
-    switch (architecture) {
-        case 'arm64': 
-            arch = 'arm64';
-            break;
-        case 'x64':
-            arch = 'amd64';
-            break;
-        case 'ia32':
-            arch = '386';
-            break;
-        default:
-            core.warning(`unknown architecture: ${architecture}; defaulting to ${arch}`);
-            break;
-    }
+  switch (architecture) {
+    case "arm64":
+      arch = "arm64";
+      break;
+    case "x64":
+      arch = "amd64";
+      break;
+    case "ia32":
+      arch = "386";
+      break;
+    default:
+      core.warning(
+        `unknown architecture: ${architecture}; defaulting to ${arch}`,
+      );
+      break;
+  }
 
-    const downloadURL = `${baseDownloadURL}/v${version}/doctl-${version}-${platform}-${arch}.${extension}`;
-    core.debug(`doctl download url: ${downloadURL}`);
-    
-    try {
-        const doctlDownload = await tc.downloadTool(downloadURL);
-        return tc.extractTar(doctlDownload);
-    } catch (error) {
-        core.warning(`Failed to download doctl v${version}: ${error.message}`);
-        throw new Error(`Download failed for version ${version}: ${error.message}`);
-    }
+  const downloadURL = `${baseDownloadURL}/v${version}/doctl-${version}-${platform}-${arch}.${extension}`;
+  core.debug(`doctl download url: ${downloadURL}`);
+
+  try {
+    const doctlDownload = await tc.downloadTool(downloadURL);
+    return tc.extractTar(doctlDownload);
+  } catch (error) {
+    core.warning(`Failed to download doctl v${version}: ${error.message}`);
+    throw new Error(`Download failed for version ${version}: ${error.message}`);
+  }
 }
 
 async function downloadDoctlWithFallback(requestedVersion, type, architecture) {
-    // If a specific version was requested, try it first
-    if (requestedVersion !== 'latest') {
-        try {
-            core.info(`Attempting to download doctl v${requestedVersion}`);
-            return await downloadDoctl(requestedVersion, type, architecture);
-        } catch (error) {
-            core.warning(`Failed to download requested version v${requestedVersion}, will try recent versions`);
-        }
+  // If a specific version was requested, try it first
+  if (requestedVersion !== "latest") {
+    try {
+      core.info(`Attempting to download doctl v${requestedVersion}`);
+      return await downloadDoctl(requestedVersion, type, architecture);
+    } catch (error) {
+      core.warning(
+        `Failed to download requested version v${requestedVersion}, will try recent versions`,
+      );
+      core.debug(`Error details: ${error.stack}`);
     }
+  }
 
-    // Get recent releases and try them in order
-    const recentReleases = await getRecentReleases(5);
-    
-    for (const version of recentReleases) {
-        try {
-            core.info(`Attempting to download doctl v${version}`);
-            const installPath = await downloadDoctl(version, type, architecture);
-            core.info(`Successfully downloaded doctl v${version}`);
-            return { installPath, version };
-        } catch (error) {
-            core.warning(`Failed to download doctl v${version}, trying next version`);
-            continue;
-        }
+  // Get recent releases and try them in order
+  const recentReleases = await getRecentReleases(5);
+
+  for (const version of recentReleases) {
+    try {
+      core.info(`Attempting to download doctl v${version}`);
+      const installPath = await downloadDoctl(version, type, architecture);
+      core.info(`Successfully downloaded doctl v${version}`);
+      return { installPath, version };
+    } catch (error) {
+      core.warning(`Failed to download doctl v${version}, trying next version`);
+      core.debug(`Error details: ${error.stack}`);
+      continue;
     }
+  }
 
-    // If all recent versions fail, throw an error
-    throw new Error(`Failed to download doctl. Tried versions: ${recentReleases.join(', ')}`);
+  // If all recent versions fail, throw an error
+  throw new Error(
+    `Failed to download doctl. Tried versions: ${recentReleases.join(", ")}`,
+  );
 }
 
 async function run() {
   try {
-    var version = core.getInput('version');
+    var version = core.getInput("version");
     var requestedVersion = version;
-    
-    if ((!version) || (version.toLowerCase() === 'latest')) {
-        version = await octokit.repos.getLatestRelease({
-            owner: 'digitalocean',
-            repo: 'doctl'
-        }).then(result => {
-            return result.data.name;
-        }).catch(error => {
-            // GitHub rate-limits are by IP address and runners can share IPs.
-            // This mostly effects macOS where the pool of runners seems limited.
-            // Fallback to a known version if API access is rate limited.
-            core.warning(`${error.message}
+
+    if (!version || version.toLowerCase() === "latest") {
+      version = await octokit.repos
+        .getLatestRelease({
+          owner: "digitalocean",
+          repo: "doctl",
+        })
+        .then((result) => {
+          return result.data.name;
+        })
+        .catch((error) => {
+          // GitHub rate-limits are by IP address and runners can share IPs.
+          // This mostly effects macOS where the pool of runners seems limited.
+          // Fallback to a known version if API access is rate limited.
+          core.warning(`${error.message}
 
 Failed to retrieve latest version; falling back to: ${fallbackVersion}`);
-            return fallbackVersion;
+          return fallbackVersion;
         });
-        requestedVersion = 'latest';
+      requestedVersion = "latest";
     }
-    if (version.charAt(0) === 'v') {
-        version = version.substr(1);
+    if (version.charAt(0) === "v") {
+      version = version.substr(1);
     }
 
     var path = tc.find("doctl", version);
     var actualVersion = version;
-    
+
     if (!path) {
-        try {
-            // Try the requested/latest version first
-            const installPath = await downloadDoctl(version, process.platform, process.arch);
-            path = await tc.cacheDir(installPath, 'doctl', version);
-            actualVersion = version;
-        } catch (error) {
-            // If the download fails (e.g., missing artifacts), try fallback versions
-            core.warning(`Failed to download doctl v${version}, trying fallback versions`);
-            const result = await downloadDoctlWithFallback(requestedVersion, process.platform, process.arch);
-            path = await tc.cacheDir(result.installPath, 'doctl', result.version);
-            actualVersion = result.version;
-        }
+      try {
+        // Try the requested/latest version first
+        const installPath = await downloadDoctl(
+          version,
+          process.platform,
+          process.arch,
+        );
+        path = await tc.cacheDir(installPath, "doctl", version);
+        actualVersion = version;
+      } catch (error) {
+        // If the download fails (e.g., missing artifacts), try fallback versions
+        core.warning(
+          `Failed to download doctl v${version}, trying fallback versions`,
+        );
+        core.debug(`Error details: ${error.stack}`);
+
+        const result = await downloadDoctlWithFallback(
+          requestedVersion,
+          process.platform,
+          process.arch,
+        );
+        path = await tc.cacheDir(result.installPath, "doctl", result.version);
+        actualVersion = result.version;
+      }
     }
-    
+
     core.addPath(path);
     core.info(`>>> doctl version v${actualVersion} installed to ${path}`);
 
     // Skip authentication if requested
     // for workflows where auth isn't necessary (e.g. doctl app spec validate --schema-only)
-    var no_auth = core.getInput('no_auth');
-    if (no_auth.toLowerCase() === 'true') {
-      core.info('>>> Skipping doctl auth');
+    var no_auth = core.getInput("no_auth");
+    if (no_auth.toLowerCase() === "true") {
+      core.info(">>> Skipping doctl auth");
       return;
     }
 
-    var token = core.getInput('token', { required: true });
+    var token = core.getInput("token", { required: true });
     core.setSecret(token);
-    await exec.exec('doctl auth init -t', [token]);
-    core.info('>>> Successfully logged into doctl');
-  }
-  catch (error) {
+    await exec.exec("doctl auth init -t", [token]);
+    core.info(">>> Successfully logged into doctl");
+  } catch (error) {
     core.setFailed(error.message);
   }
 }
